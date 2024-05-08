@@ -1,54 +1,444 @@
 import re
+import ast
 
-# Define tokens
-TOKENS = [
-    ('KEYWORD', r'if|else|while|for|def'),  # Example keywords
-    ('IDENTIFIER', r'[a-zA-Z_][a-zA-Z0-9_]*'),  # Variable names, function names
-    ('PUNCTUATION', r'[\(\)\{\}\[\];:,]'),  # Parentheses, braces, semicolons, colons
-    ('OPERATOR', r'[+\-*/%=<>]'),  # Arithmetic, comparison operators
-    ('LITERAL', r'\d+'),  # Integer literals
-    ('WHITESPACE', r'\s+'),  # Whitespace
-    ('UNKNOWN', r'.'),  # Any other character
-]
+class Tokenizer:
+    def __init__(self, type, value):
+        self.type = type
+        self.value = value
 
-# Lexer
-def lexer(code):
-    tokens = []
-    for token in TOKENS:
-        name, pattern = token
-        regex = re.compile(pattern)
-        match = regex.match(code)
-        if match:
-            value = match.group(0)
-            tokens.append((name, value))
-            code = code[len(value):].strip()
-    return tokens
+class Lexer:
+    def __init__(self, code):
+        self.code = code
+        self.position = 0
+        self.currentCharacter = self.code[self.position]
+        print("Lexer Initiated with Code:", self.code)
 
-# Parser
-def parse(tokens):
-    instructions = []
-    for token in tokens:
-        if token[0] == 'LABEL':
-            label = token[1][:-1]  # Remove ':' from label
-            instructions.append(('LABEL', label))
-        elif token[0] == 'INSTRUCTION':
-            instruction = token[1]
-            operands = []
-            while tokens and tokens[0][0] not in ['LABEL', 'INSTRUCTION']:
-                operands.append(tokens.pop(0)[1])
-            instructions.append((instruction, operands))
-    return instructions
+    def increment(self):
+        #print("Position before Increment", self.position)
+        self.position += 1
 
-# Example assembly code
-assembly_code = """
-LOOP:
-    MOV R1, 10
-    MOV R2, 20
-    ADD R3, R1, R2
-    JMP LOOP
-"""
+        if self.position < len(self.code):
+            self.currentCharacter = self.code[self.position]
+        else:
+            self.currentCharacter = None
+        
+        #print("Position After Increment:", self.position)
+        #print("Current Character After Increment", self.currentCharacter)
+    
 
-# Tokenize and parse assembly code
-tokens = lexer(assembly_code)
-instructions = parse(tokens)
-print(instructions) 
+    def skipWhitespace(self):
+        while self.currentCharacter is not None and self.currentCharacter.isspace():
+            self.increment()
+        
+    def getNextToken(self):
+        #print("Current Character:", self.currentCharacter)
+        while self.currentCharacter is not None:
+            if self.currentCharacter.isspace():
+                self.skipWhitespace()
+                continue
+            
+            elif self.currentCharacter.isalpha():
+                token = self.tokenizeIdentifier()
+                self.increment()
+                return token
+            
+            elif self.currentCharacter.isdigit():
+                token = self.tokenizeNumber()
+                self.increment()
+                return token
+            
+            elif self.currentCharacter == '+':
+                self.increment()
+                if self.currentCharacter == '=':
+                    self.increment()
+                    return Tokenizer('INCREMENT', '+=')
+                else:
+                    return Tokenizer('ADDITION', '+')
+                
+            elif self.currentCharacter == '-':
+                self.increment()
+                if self.currentCharacter == '=':
+                    self.increment()
+                    return Tokenizer('DECREMENT', '+=')
+                else:
+                    return Tokenizer('SUBTRACTION', '-')
+                
+            elif self.currentCharacter == '*':
+                self.increment()
+                if self.currentCharacter == '*':
+                    self.increment()
+                    return Tokenizer('EXPONENT', '**')
+                else:
+                    return Tokenizer('MULTIPLICATION', '*')
+                
+            elif self.currentCharacter == '=':
+                self.increment()
+                if self.currentCharacter == '=':
+                    self.increment()
+                    return Tokenizer('EQUAL', '==')
+                else:
+                    return Tokenizer('BECOMES', '=')
+                
+            elif self.currentCharacter == '!':
+                self.increment()
+                if self.currentCharacter == '=':
+                    self.increment()
+                    return Tokenizer('INEQUAL', '!=')
+                else:
+                    return Tokenizer('n/a', '!')
+                
+            elif self.currentCharacter == '>':
+                self.increment()
+                if self.currentCharacter == '=':
+                    self.increment()
+                    return Tokenizer('GREATER THAN OR EQUAL', '>=')
+                else:
+                    return Tokenizer('GREATER', '>')
+                
+            elif self.currentCharacter == '<':
+                self.increment()
+                if self.currentCharacter == '=':
+                    self.increment()
+                    return Tokenizer('LESS THAN OR EQUAL', '<=')
+                else:
+                    return Tokenizer('GREATER', '>')
+
+            elif self.currentCharacter == '/':
+                self.increment()
+                return Tokenizer('DIVIDE', '/')
+            
+            elif self.currentCharacter == '(':
+                self.increment()
+                return Tokenizer('LEFT PARENTHESIS', '(')
+            
+            elif self.currentCharacter == ')':
+                self.increment()
+                return Tokenizer('RIGHT PARENTHESIS', ')')
+            
+            elif self.currentCharacter == '"':
+                self.increment()
+                return Tokenizer('QUOTATIONS', '"')
+            
+            elif self.currentCharacter == '[':
+                self.increment()
+                return Tokenizer('LEFT BRACKET', '[')
+            
+            elif self.currentCharacter == ']':
+                self.increment()
+                return Tokenizer('RIGHT BRACKET', ']')
+            
+            elif self.currentCharacter == '{':
+                self.increment()
+                return Tokenizer('LEFT BRACES', '{')
+            
+            elif self.currentCharacter == '}':
+                self.increment()
+                return Tokenizer('RIGHT BRACES', '}')
+            
+            elif self.currentCharacter == '%':
+                self.increment()
+                return Tokenizer('MODULO', '%')
+            
+            elif self.currentCharacter == ':':
+                self.increment()
+                return Tokenizer('COLON', ':')
+            
+            elif self.currentCharacter == '#':
+                self.increment()
+                return Tokenizer('COMMENT', '#')
+            
+            else:
+                self.increment()
+                return Tokenizer('ERROR', 'n/a')
+        
+        #print("Current Character After Loop:", self.currentCharacter)
+        return Tokenizer('End of File', None)
+    
+    def tokenizeIdentifier(self):
+        result = ''
+
+        while self.currentCharacter is not None and (self.currentCharacter.isalnum() or self.currentCharacter == '_'):
+            result += self.currentCharacter
+            self.increment()
+
+        if result:
+            if result.lower() == 'print':
+                return Tokenizer('PRINT', 'print')
+            elif result.lower() == 'if':
+                return Tokenizer('IF', 'if')
+            elif result.lower() == 'and':
+                return Tokenizer('AND', 'and')
+            elif result.lower() == 'or':
+                return Tokenizer('OR', 'or')
+            elif result.lower() == 'not':
+                return Tokenizer('NOT', 'not')
+            else:
+                return Tokenizer('IDENTIFIER', result)
+
+        #print("Tokenize Identifier: Result", result)    
+        return Tokenizer('IDENTIFIER', result)
+    
+    def tokenizeNumber(self):
+        result = ''
+
+        while self.currentCharacter is not None and self.currentCharacter.isdigit():
+            result += self.currentCharacter
+            self.increment()
+        
+        if result:
+            #print("Tokenize Number: Result", result)
+            return Tokenizer('NUMBER', int(result))
+        
+        #print("Tokenize Number: Error - Invalid Number Format")
+        return Tokenizer('ERROR', 'Invalid Number Format')
+    
+def extractNumber(text):
+        tokens = ''.join(re.findall('[0123456789+-^/*()]', text))
+        return tokens
+
+def math(text):
+        tokens = extractNumber(text)
+        result = calculate(tokens)
+        return result
+    
+def calculate(expression):
+        precedence = {'+': 1, '-': 1, '*': 2, '/': 2, '^': 3}
+
+        def applyOperator(operators, values):
+            #print("Applying Operator:", operators[-1])
+            #print("Current Values:", values)
+            #print("Current Operators:", operators)
+
+            operator = operators.pop()
+            right = values.pop()
+            left = values.pop()
+
+            if operator == '+':
+                values.append(left + right)
+            
+            elif operator == '-':
+                values.append(left - right)
+
+            elif operator == '*':
+                values.append(left * right)
+            
+            elif operator == '/':
+                values.append(left / right)
+
+            elif operator == '^':
+                values.append(left ** right)
+            
+            
+        
+        def evaluate(expression):
+            values = []
+            operators = []
+
+            i = 0
+
+            while i < len(expression):
+                if expression[i] == '(':
+                    j = i
+                    count = 0
+                    while j < len(expression):
+                        if expression[j] == '(':
+                            count += 1
+                        elif expression[j] == ')':
+                            count -= 1
+                            if count == 0:
+                                break
+                        j += 1
+                    
+                    values.append(evaluate(expression[i + 1 : j]))
+                    i = j
+                
+                elif expression[i].isdigit():
+                    j = i
+                    while j < len(expression) and (expression[j].isdigit() or expression[j] == '.'):
+                        j += 1
+                    values.append(float(expression[i : j]))
+                    i = j - 1
+                
+                elif expression[i] in precedence:
+                    #print("Encountered operator:", expression[i])  # Add this line for debugging
+                    #print("Pushing operator onto stack:", expression[i])  # Add this line for debugging
+                    operators.append(expression[i])
+
+                elif expression[i] == ')':
+                    while operators[-1] != '(':
+                        #print("Pooping and Applying Operators from Stack:", operators[-1])
+                        applyOperator(operators, values)
+                    operators.pop()
+
+                i += 1
+
+            while operators:
+                #print("Popping and Applying Operator From Stack:", operators[-1])
+                applyOperator(operators, values)
+
+            return values[0]
+            
+        return evaluate(expression)
+       
+
+
+def ifStatement(text):
+    parts = text.split(':')
+
+    if len(parts) != 2:
+        return 'ERROR: Incorrect if-statement format'
+
+    condition = parts[0]
+    code_block = parts[1]
+
+    print("Condition:", condition)
+    if compareStatement(condition):
+        print("Condition is True")
+        return code_block
+
+    print("Condition is False")
+    return ''
+            
+def logicalStatement(parts):
+            parts2 = ''
+            if 'and' in parts[0]:
+                parts2 = parts[0].split('and')
+                result1 = compareStatement(parts2[0])
+                result2 = compareStatement(parts2[1])
+
+                if result1 == True and result2 == False:
+                    return parts[1]
+                elif result1 == False or result2 == False:
+                    return False
+                elif result1 == 'ERROR' or result2 == 'ERROR':
+                    return 'ERROR'
+            elif 'or' in parts[0]:
+                parts2 = parts[0].split('or')
+                result1 = compareStatement(parts2[0])
+                result2 = compareStatement(parts2[1])
+
+                if result1 == True or result2 == True:
+                    return parts[1]
+                elif result1 == 'ERROR' or result2 == 'ERROR':
+                    return 'ERROR'
+                
+def compareStatement(parts):
+            numbers = 0
+
+            if '==' in parts:
+                numbers = parts.split('==')
+                print("Comparing:", numbers[0], "==", numbers[1])
+                if numbers[0] == numbers[1]:
+                    print("Result: True")
+                    return True
+                else:
+                    print("Result: False")
+                    return False
+                
+            if '!=' in parts:
+                numbers = parts.split('!=')
+                print("Comparing:", numbers[0], "!=", numbers[1])
+                if numbers[0] != numbers[1]:
+                    return True
+                else:
+                    return False
+                
+            if '>=' in parts:
+                numbers = parts.split('>=')
+                print("Comparing:", numbers[0], ">=", numbers[1])
+                if numbers[0] >= numbers[1]:
+                    return True
+                else:
+                    return False
+                
+            if '<=' in parts:
+                numbers = parts.split('<=')
+                print("Comparing:", numbers[0], "<=", numbers[1])
+                if numbers[0] <= numbers[1]:
+                    return True
+                else:
+                    return False
+                
+            if '>' in parts:
+                numbers = parts.split('>')
+                print("Comparing:", numbers[0], ">", numbers[1])
+                if numbers[0] > numbers[1]:
+                    return True
+                else:
+                    return False
+                
+            if '<' in parts:
+                numbers = parts.split('<')
+                print("Comparing:", numbers[0], "<", numbers[1])
+                if numbers[0] < numbers[1]:
+                    return True
+                else:
+                    return False
+                
+            else:
+                return 'ERROR'
+            
+def main():
+            error = False
+            output = False
+            ifState = False
+            comment = False
+            lineNumber = 0
+            text = ''
+            num = 0
+
+            try:
+                print("Starting main function")
+                # Existing code for the main function
+                with open('testcode.txt', 'r') as file:
+                    for line in file:
+                        print("Line Read:", line.strip())
+                        lexer = Lexer(line)
+                        print("Processing Tokens in the Line")
+
+                        while True:
+                            token = lexer.getNextToken()
+                            print("Token:", token.type, token.value)
+                            if token.type == 'COMMENT':
+                                comment = True
+                                break
+
+                            elif token.type == 'ERROR':
+                                print('Line', lineNumber, 'Includes an Error. Incorrect Character.')
+                                break
+                            
+                            if error == True:
+                                continue
+
+                            if ifState == True:
+                                if ifStatement(text) == 'error':
+                                    error = True
+                                    print('Line', lineNumber, 'Includes an Error. Incorrect If Statement.')
+                                    output = False
+                                    continue
+                                if ifStatement(text) == False:
+                                    text = ''
+                                    output = False
+                                    continue
+                                text = ifStatement(text)
+                            
+                            if token.type == 'PRINT' and token.value == 'print':
+                                expression = lexer.code.split('(')[1].split(')')[0].strip()
+                                print("Expression to be Calculated:", expression)
+                                result = calculate(expression)
+                                print("Result of the expression:", result)
+
+                            # Existing code for processing tokens
+                            if token.type == "End of File":
+                                break
+                        
+                        print("-------------------------")
+                        #lexer.position = 0
+                        #lexer.currentCharacter = lexer.code[lexer.position]
+            except Exception as e:
+                print("An ERROR Occurred:", e)
+
+if __name__ == "__main__":
+    main()
+
+            
