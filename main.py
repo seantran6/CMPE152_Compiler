@@ -33,7 +33,10 @@ class Lexer:
     def getNextToken(self):
         #print("Current Character:", self.currentCharacter)
         while self.currentCharacter is not None:
-            if self.currentCharacter.isspace():
+            if self.position >= len(self.code):
+                return Tokenizer('End of File', None)
+            
+            elif self.currentCharacter.isspace():
                 self.skipWhitespace()
                 continue
             
@@ -146,10 +149,12 @@ class Lexer:
             elif self.currentCharacter == '#':
                 self.increment()
                 return Tokenizer('COMMENT', '#')
-            
+                    
             else:
                 self.increment()
                 return Tokenizer('ERROR', 'n/a')
+            
+            
         
         #print("Current Character After Loop:", self.currentCharacter)
         return Tokenizer('End of File', None)
@@ -283,21 +288,25 @@ def calculate(expression):
 
 
 def ifStatement(text):
-    parts = text.split(':')
+    print("Inside ifStatement. Text:", text)  # Add this line for debugging
+    parts = text.split(':', 1)  # Split into condition and code block
+    print("Parts after split:", parts)  # Add this line for debugging
 
     if len(parts) != 2:
-        return 'ERROR: Incorrect if-statement format'
+        return 'ERROR: Incorrect If-Statement Format'
 
-    condition = parts[0]
+    condition = parts[0].strip()  # Extract the condition part
     code_block = parts[1]
 
     print("Condition:", condition)
-    if compareStatement(condition):
-        print("Condition is True")
+    result = compareStatement(condition)
+    print("Comparison Result:", result)  # Add debugging output
+    if result == 'ERROR':
+        return 'ERROR: Incorrect If Statement Format'
+    elif not result:
+        return ''
+    else:
         return code_block
-
-    print("Condition is False")
-    return ''
             
 def logicalStatement(parts):
             parts2 = ''
@@ -323,56 +332,68 @@ def logicalStatement(parts):
                     return 'ERROR'
                 
 def compareStatement(parts):
+            print("Inside compareStatement. Parts:", parts)  # Add this line for debugging
             numbers = 0
+            print("Comparing:", parts)
 
             if '==' in parts:
                 numbers = parts.split('==')
-                print("Comparing:", numbers[0], "==", numbers[1])
-                if numbers[0] == numbers[1]:
-                    print("Result: True")
+                #print("Comparing:", numbers[0], "==", numbers[1])
+                if float(numbers[0].strip()) == float(numbers[1].strip()):
+                    #print("Result: True")
                     return True
                 else:
-                    print("Result: False")
+                    #print("Result: False")
                     return False
                 
             if '!=' in parts:
                 numbers = parts.split('!=')
-                print("Comparing:", numbers[0], "!=", numbers[1])
-                if numbers[0] != numbers[1]:
+                #print("Comparing:", numbers[0], "!=", numbers[1])
+                if float(numbers[0].strip()) != float(numbers[1].strip()):
+                    #print("Result: True")
                     return True
                 else:
+                    #print("Result: False")
                     return False
                 
             if '>=' in parts:
                 numbers = parts.split('>=')
-                print("Comparing:", numbers[0], ">=", numbers[1])
-                if numbers[0] >= numbers[1]:
+                #print("Comparing:", numbers[0], ">=", numbers[1])
+                if float(numbers[0].strip()) >= float(numbers[1].strip()):
+                    #print("Result: True")
                     return True
                 else:
+                    #print("Result: False")
                     return False
                 
             if '<=' in parts:
                 numbers = parts.split('<=')
-                print("Comparing:", numbers[0], "<=", numbers[1])
-                if numbers[0] <= numbers[1]:
+                #print("Comparing:", numbers[0], "<=", numbers[1])
+                if float(numbers[0].strip()) <= float(numbers[1].strip()):
+                    #print("Result: True")
                     return True
                 else:
+                    #print("Result: False")
                     return False
                 
             if '>' in parts:
                 numbers = parts.split('>')
-                print("Comparing:", numbers[0], ">", numbers[1])
-                if numbers[0] > numbers[1]:
+                #print("Comparing:", numbers[0], ">", numbers[1])
+                if float(numbers[0].strip()) > float(numbers[1].strip()):
+                    #print("Result: True")
                     return True
                 else:
+                    #print("Result: False")
                     return False
                 
             if '<' in parts:
                 numbers = parts.split('<')
-                print("Comparing:", numbers[0], "<", numbers[1])
-                if numbers[0] < numbers[1]:
+                #print("Comparing:", numbers[0], "<", numbers[1])
+                if float(numbers[0].strip()) < float(numbers[1].strip()):
+                    #print("Result: True")
                     return True
                 else:
+                    #print("Result: False")
                     return False
                 
             else:
@@ -398,7 +419,7 @@ def main():
 
                         while True:
                             token = lexer.getNextToken()
-                            print("Token:", token.type, token.value)
+                            print("Token:", token.type, token.value) #Can Comment Out if You Don't Want to Print Tokens
                             if token.type == 'COMMENT':
                                 comment = True
                                 break
@@ -410,17 +431,20 @@ def main():
                             if error == True:
                                 continue
 
-                            if ifState == True:
-                                if ifStatement(text) == 'error':
-                                    error = True
+                            if token.type == 'IF':
+                                ifState = True
+                                text = line.split('if', 1)[1].strip()  # Extract the text after "IF"
+                                print("Text after IF:", text)
+
+                            if ifState:
+                                result = ifStatement(text)
+                                if result == 'ERROR':
                                     print('Line', lineNumber, 'Includes an Error. Incorrect If Statement.')
-                                    output = False
-                                    continue
-                                if ifStatement(text) == False:
-                                    text = ''
-                                    output = False
-                                    continue
-                                text = ifStatement(text)
+                                elif not result:
+                                    ifState = False  # Reset ifState
+                                else:
+                                    print("Code Block:", result)
+                                    ifState = False  # Reset ifState
                             
                             if token.type == 'PRINT' and token.value == 'print':
                                 expression = lexer.code.split('(')[1].split(')')[0].strip()
@@ -431,7 +455,7 @@ def main():
                             # Existing code for processing tokens
                             if token.type == "End of File":
                                 break
-                        
+                    
                         print("-------------------------")
                         #lexer.position = 0
                         #lexer.currentCharacter = lexer.code[lexer.position]
